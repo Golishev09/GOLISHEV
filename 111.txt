@@ -1,0 +1,297 @@
+1. Создать класс. Прописать все значения.
+
+public class baza
+{
+        public int id { get; set; }
+        public string fio { get; set; }
+        public int phone { get; set; }
+        public int adress { get; set; }
+}
+
+2. MainWindow.axaml
+
+ <Grid>
+        <StackPanel Orientation="Vertical">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Margin = "10 10 0 0"> Поиск по фио: </TextBlock>
+                <TextBox Name="SearchFio" Width="200" Margin ="10 10 0 0" TextChanged="Search"></TextBox>
+            </StackPanel>
+
+            <DataGrid Name="StudentGrid" x:CompileBindings="False" Margin ="10 20 0 0" Height="250">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="id" Binding="{Binding id}"></DataGridTextColumn>
+                    <DataGridTextColumn Header="fio" Binding="{Binding fio}"></DataGridTextColumn>
+                    <DataGridTextColumn Header="phone" Binding="{Binding phone}"></DataGridTextColumn>
+                    <DataGridTextColumn Header="adress" Binding="{Binding adress}"></DataGridTextColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </StackPanel>
+    </Grid>
+
+3. MainWindow.axaml.cs
+
+using Avalonia.Controls;
+using Avalonia;
+using Avalonia.Markup.Xaml;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using MySql.Data.MySqlClient;
+using System;
+namespace exam;
+
+public partial class MainWindow : Window
+{
+    private List<baza> _stud;
+    private string connStr = "server=localhost;database=sed22;port=3306;User Id=root;password=кщще";
+    private MySqlConnection conn;
+    public MainWindow()
+    {
+        InitializeComponent();
+        string table = "SELECT * FROM student";
+        ShowData(table);
+    }
+    
+    public void ShowData(string sql)
+    {
+        _stud = new List<baza>();
+        conn = new MySqlConnection(connStr);
+        conn.Open();
+        MySqlCommand command = new MySqlCommand(sql, conn);
+        MySqlDataReader reader = command.ExecuteReader();
+        while (reader.Read() && reader.HasRows)
+        {
+            var currentGuest = new baza()
+            { 
+                id = reader.GetInt32("id"),
+                fio = reader.GetString("fio"),
+                phone = reader.GetString("phone"),
+                adress = reader.GetString("adress"),
+            };
+            _stud.Add(currentGuest);
+        }
+        conn.Close();
+        StudentGrid.ItemsSource = _stud;
+    }
+
+4. App.axaml
+<StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+
+
+
+ПОИСК (регистр учитывается) писать в MainWindow.axaml.cs
+
+  private void Search(object? sender, TextChangedEventArgs e)
+   {
+       var stud = _stud;
+       stud = stud.Where(x => x.fio.Contains(SearchFio.Text)).ToList();
+       StudentGrid.ItemsSource = stud;
+   }
+
+Размеька в MainAxaml
+
+<StackPanel Orientation="Vertical">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" Margin = "10 10 0 0"> Поиск по фио: </TextBlock>
+                <TextBox Name="SearchFio" Width="200" Margin ="10 10 0 0" TextChanged="Search"></TextBox>
+            </StackPanel>
+
+ФИЛЬТРАЦИЯ
+
+private void Cmb_Dost(object? sender, SelectionChangedEventArgs e)
+    {
+        var gorod = (ComboBox)sender;
+        var currentGor = gorod.SelectedItem as baza;
+        var filtrGor = _stud
+            .Where(x => x.adress == currentGor.adress)
+            .ToList();
+        StudentGrid.ItemsSource = filtrGor;
+    }
+ public void FillDostList()
+    {
+        _stud = new List<baza>();
+        conn = new MySqlConnection(connStr);
+        conn.Open();
+        MySqlCommand command = new MySqlCommand("select * from student", conn);
+        MySqlDataReader reader = command.ExecuteReader();
+        while (reader.Read() && reader.HasRows)
+        {
+            var currentGor = new baza()
+            {
+                id = reader.GetInt32("id"),
+                fio = reader.GetString("fio"),
+                phone = reader.GetString("phone"),
+                adress = reader.GetString("adress"),
+            };
+            _stud.Add(currentGor);
+        }
+conn.Close();
+        var gorcmb = this.Find<ComboBox>(name: "CmbDost");
+        gorcmb.ItemsSource = _stud;
+    }
+
+РАЗМЕТКА
+
+ <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           x:Name="FilterDost" Margin ="10 10 0 0">Фильтрация по городу: </TextBlock>
+                <ComboBox Name="CmbDost" Width="200" Margin ="10 10 0 0" 
+                          x:CompileBindings="False"
+                          SelectionChanged="Cmb_Dost">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding adress}"></TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+УДАЛЕНИЕ (выбрать запись в таблице и нажать кнопку "удалить")
+
+ private void DeleteData(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            baza stttud = StudentGrid.SelectedItem as baza;
+            if (stttud == null)
+            {
+                return;
+            }
+            conn = new MySqlConnection(connStr);
+            conn.Open();
+            string sql = "DELETE FROM student WHERE id = " + stttud.id;
+            MySqlCommand cmd = new MySqlCommand(sql, conn);
+            cmd.ExecuteNonQuery();
+            conn.Close();
+            _stud.Remove(stttud);
+            ShowTable("SELECT id, fio, phone, adress FROM student;");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+РАЗМЕТКА
+
+<StackPanel Margin="10 12 00 0">
+                <Button Name="Delete" Content="Удалить" Click="DeleteData"></Button>
+            </StackPanel>
+
+ДОБАВЛЕНИЕ И РЕДАКТИРОВАНИЕ
+ФОРМ 1
+
+ private void AddData(object? sender, RoutedEventArgs e)
+    {
+        baza newStud = new baza();
+        exam.Form2 form2 = new exam.Form2(newStud, _stud);
+        form2.Show();
+        this.Hide();
+    }
+
+    private void EditData(object? sender, RoutedEventArgs e)
+    {
+        baza stttud = StudentGrid.SelectedItem as baza;
+        if (stttud == null)
+        {
+            return;
+        }
+
+        exam.Form2 form2 = new exam.Form2(stttud, _stud);
+        form2.Show();
+        this.Hide();
+    }
+
+ФОРМ 2
+
+public partial class Form2 : Window
+{
+    private string connStr = "server=localhost;database=sed22;port=3306;User Id=root;password=кщще";
+    private MySqlConnection conn;
+
+    private List<baza> Stttud;
+    private baza _Stud;
+
+    //private List<baza> _stud;
+    //private baza stttud; 
+
+    public Form2(baza stttud, List<baza> _stud)
+    {
+        InitializeComponent();
+        _Stud = stttud;
+        this.DataContext = _Stud;
+        Stttud = _stud;
+    }
+
+    private void Save_OnClick(object? sender, RoutedEventArgs e)
+    {
+            var zzz = Stttud.FirstOrDefault(x => x.id == _Stud.id);
+            if (zzz == null)
+            {
+                try
+                {
+                    conn = new MySqlConnection(connStr);
+                    conn.Open();
+                    string add = "INSERT INTO student (id, fio, phone, adress) VALUES (" + Convert.ToInt32(id.Text) + ", '" + fio.Text + "', '" + phone.Text + "', '" + adress.Text + "');";
+                    MySqlCommand cmd = new MySqlCommand(add, conn);
+                    cmd.ExecuteNonQuery();
+                    conn.Close();
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine("Error" + exception);
+                }
+            }
+            else
+            {
+                try
+                {
+                    conn = new MySqlConnection(connStr);
+                    conn.Open();
+                    string upd = "UPDATE student SET fio = '" + fio.Text + "', phone = '" + phone.Text + "', adress = '" + adress.Text + "' WHERE id = " + Convert.ToInt32(id.Text) + ";";
+                    MySqlCommand cmd = new MySqlCommand(upd, conn);
+                    cmd.ExecuteNonQuery();
+                    conn.Close();
+                }
+                catch (Exception exception)
+                {
+                    Console.Write("Error" + exception);
+                }
+            }
+        }
+
+РАЗМЕТКА
+
+ <Grid>
+                <UniformGrid Columns="1">
+                        <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin = "10 35 0 0">student: </TextBlock>
+                                <TextBox Name="id" x:CompileBindings="False" Text="{Binding id}" Width="200" Height="5" Margin = "10 0 0 0"></TextBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin = "10 35 0 0">ФИО гостя: </TextBlock>
+                                <TextBox Name="fio" x:CompileBindings="False" Text="{Binding fio}" Width="200" Height="5" Margin = "10 0 0 0"></TextBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin = "10 35 0 0">Номер телефона: </TextBlock>
+                                <TextBox Name="phone" x:CompileBindings="False" Text="{Binding phone}" Width="200" Height="5" Margin = "10 0 0 0"></TextBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin = "10 35 0 0">Адрес: </TextBlock>
+                                <TextBox Name="adress" x:CompileBindings="False" Text="{Binding adress}" Width="200" Height="5" Margin = "10 0 0 0"></TextBox>
+                        </StackPanel>
+                        
+                        
+                        
+                        <StackPanel Orientation="Horizontal">
+                                <Button Name="Save" Content="Сохранить" Click="Save_OnClick" Margin = "10 15 0 20"></Button>
+                                <Button Name="Back" Content="Назад" Click="GoBack" Margin = "50 15 0 20"></Button>
+                        </StackPanel>
+                </UniformGrid>
+        </Grid>
+
+
+
+
+
